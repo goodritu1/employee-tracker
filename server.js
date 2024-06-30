@@ -12,6 +12,9 @@ const client = new Client({
 
 client.connect();
 
+// Start the application
+showMainMenu();
+
 // Function to display the main menu
 async function showMainMenu() {
   while (true) {
@@ -207,6 +210,5 @@ async function updateEmployeeRole() {
   console.log('Employee role updated successfully!');
 }
 
-// Start the application
-showMainMenu();
+
 

@@ -8,9 +8,9 @@ VALUES ('Salesperson', 50000, 1),
 ('Marketing Manager', 70000,2),
 ('Software Engineer', 80000,3),
 ('Accountant', 60000, 1),
-('Lawyer', 90000, 3),
+('Project Manager', 90000, 3),
 ('Marketing Associate', 100000, 2),
-('HR Manager', 70000, 3),
+('Product Manager', 70000, 3),
 ('Account Manager', 80000, 1);
 
 
