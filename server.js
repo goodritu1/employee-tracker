@@ -1,266 +1,206 @@
 
 const inquirer = require('inquirer');
+const { Client } = require('pg');
 
-inquirer.prompt([
-  {
-    type: 'list',
-    name: 'option',
-    message: 'What would you like to do?',
-    choices: [
-      'View all departments',
-      'Add an employee',
-      'Update an employee role',
-      'View all roles',
-      'Add a role',
-      'View all employees',
-      'Add a department',
-      'Quit' 
-    ],
-  }
-])
-.then((answers) => {
-  console.log(answers);
-})
-.catch((error) => {
-  console.log(error);
+// PostgreSQL connection details
+const client = new Client({
+  host: 'localhost',
+  user: 'postgres',
+  password: 'Apinki14$',
+  database: 'company_db'
 });
 
+client.connect();
 
-// const inquirer = require("inquirer");
-// const { Pool } = require('pg');
+// Function to display the main menu
+async function showMainMenu() {
+  const { choice } = await inquirer.prompt([
+    {
+      type: 'list',
+      name: 'choice',
+      message: 'What would you like to do?',
+      choices: [
+        'View all departments',
+        'View all roles',
+        'View all employees',
+        'Add a department',
+        'Add a role',
+        'Add an employee',
+        'Update an employee role',
+        'Quit'
+      ]
+    }
+  ])
+  switch (choice) {
+    case 'View all departments':
+      await viewDepartments();
+      break;
+    case 'View all roles':
+      await viewRoles();
+      break;
+    case 'View all employees':
+      await viewEmployees();
+      break;
+    case 'Add a department':
+      await addDepartment();
+      break;
+    case 'Add a role':
+      await addRole();
+      break;
+    case 'Add an employee':
+      await addEmployee();
+      break;
+    case 'Update an employee role':
+      await updateEmployeeRole();
+      break;
+    case 'Exit':
+      console.log('Goodbye!');
+      client.end();
+      return;
+  }
 
-// const pool = new Pool({
-//   user: 'postgres',
-//   host: 'localhost',
-//   database: 'employee_tracker',
-//   password: 'Apinki14$',
-//   port: 3001,
-// });
+  showMainMenu();
+}
+// Function to view all departments
+async function viewDepartments() {
+  const result = await client.query('SELECT * FROM departments');
+  console.table(result.rows);
+}
 
-// // const inquirer = new Inquirer();
+// Function to view all roles
+async function viewRoles() {
+  const result = await client.query(`
+    SELECT
+      roles.id,
+      roles.title,
+      departments.name AS department,
+      roles.salary
+    FROM roles
+    JOIN departments ON roles.department_id = departments.id
+  `);
+  console.table(result.rows);
+}
 
-// const departments = [];
-// const roles = [];
-// const employees = [];
+// Function to view all employees
+async function viewEmployees() {
+  const result = await client.query(`
+    SELECT
+      employees.id,
+      employees.first_name,
+      employees.last_name,
+      roles.title AS job_title,
+      departments.name AS department,
+      roles.salary,
+      CONCAT(managers.first_name, ' ', managers.last_name) AS manager
+    FROM employees
+    JOIN roles ON employees.role_id = roles.id
+    JOIN departments ON roles.department_id = departments.id
+    LEFT JOIN employees AS managers ON employees.manager_id = managers.id
+  `);
+  console.table(result.rows);
+}
 
-// pool.query('SELECT * FROM department', (err, result) => {
-//   if (err) {
-//     console.error(err);
-//     return;
-//   }
-//   departments = result.rows;
-// });
+// Function to add a department
+async function addDepartment() {
+  const { name } = await inquirer.prompt([
+    {
+      type: 'input',
+      name: 'name',
+      message: 'Enter the name of the new department:'
+    }
+  ]);
 
-// pool.query('SELECT * FROM role', (err, result) => {
-//   if (err) {
-//     console.error(err);
-//     return;
-//   }
-//   roles = result.rows;
-// });
+  await client.query('INSERT INTO departments (name) VALUES ($1)', [name]);
+  console.log('Department added successfully!');
+}
 
-// pool.query('SELECT * FROM employee', (err, result) => {
-//   if (err) {
-//     console.error(err);
-//     return;
-//   }
-//   employees = result.rows;
-// });
+// Function to add a role
+async function addRole() {
+  const departments = (await client.query('SELECT * FROM departments')).rows;
+  const { title, salary, department } = await inquirer.prompt([
+    {
+      type: 'input',
+      name: 'title',
+      message: 'Enter the title of the new role:'
+    },
+    {
+      type: 'number',
+      name: 'salary',
+      message: 'Enter the salary for the new role:'
+    },
+    {
+      type: 'list',
+      name: 'department',
+      message: 'Select the department for the new role:',
+      choices: departments.map(dept => dept.name)
+    }
+  ]);
 
-// const mainMenu = [
-//   {
-//     type: 'list',
-//     name: 'option',
-//     message: 'What would you like to do?',
-//     choices: [
-//       'View all departments',
-//       'View all roles',
-//       'View all employees',
-//       'Add a department',
-//       'Add a role',
-//       'Add an employee',
-//       'Update an employee role',
-//     ],
-//   },
-// ];
+  const departmentId = departments.find(dept => dept.name === department).id;
+  await client.query('INSERT INTO roles (title, salary, department_id) VALUES ($1, $2, $3)', [title, salary, departmentId]);
+  console.log('Role added successfully!');
+}
 
-// const viewDepartments = () => {
-//   console.log('Departments:');
-//   console.table(departments);
-//   inquirer.prompt(mainMenu).then(answers => {
-//     handleOption(answers.option);
-//   });
-// };
+// Function to add an employee
+async function addEmployee() {
+  const roles = (await client.query('SELECT * FROM roles')).rows;
+  const employees = (await client.query('SELECT id, first_name, last_name FROM employees')).rows;
+  const { firstName, lastName, role, manager } = await inquirer.prompt([
+    {
+      type: 'input',
+      name: 'firstName',
+      message: 'Enter the employee\'s first name:'
+    },
+    {
+      type: 'input',
+      name: 'lastName',
+      message: 'Enter the employee\'s last name:'
+    },
+    {
+      type: 'list',
+      name: 'role',
+      message: 'Select the employee\'s role:',
+      choices: roles.map(role => role.title)
+    },
+    {
+      type: 'list',
+      name: 'manager',
+      message: 'Select the employee\'s manager:',
+      choices: ['None', ...employees.map(emp => `${emp.first_name} ${emp.last_name}`)]
+    }
+  ]);
 
-// const viewRoles = () => {
-//   console.log('Roles:');
-//   console.table(roles);
-//   inquirer.prompt(mainMenu).then(answers => {
-//     handleOption(answers.option);
-//   });
-// };
+  const roleId = roles.find(r => r.title === role).id;
+  const managerId = manager === 'None' ? null : employees.find(emp => `${emp.first_name} ${emp.last_name}` === manager).id;
+  await client.query('INSERT INTO employees (first_name, last_name, role_id, manager_id) VALUES ($1, $2, $3, $4)', [firstName, lastName, roleId, managerId]);
+  console.log('Employee added successfully!');
+}
 
-// const viewEmployees = () => {
-//   console.log('Employees:');
-//   console.table(employees);
-//   inquirer.prompt(mainMenu).then(answers => {
-//     handleOption(answers.option);
-//   });
-// };
+// Function to update an employee role
+async function updateEmployeeRole() {
+  const employees = (await client.query('SELECT id, first_name, last_name FROM employees')).rows;
+  const roles = (await client.query('SELECT id, title FROM roles')).rows;
+  const { employee, newRole } = await inquirer.prompt([
+    {
+      type: 'list',
+      name: 'employee',
+      message: 'Select the employee to update:',
+      choices: employees.map(emp => `${emp.first_name} ${emp.last_name}`)
+    },
+    {
+      type: 'list',
+      name: 'newRole',
+      message: 'Select the new role for the employee:',
+      choices: roles.map(role => role.title)
+    }
+  ]);
 
-// const addDepartment = () => {
-//   inquirer.prompt([
-//     {
-//       type: 'input',
-//       name: 'name',
-//       message: 'Enter department name:',
-//     },
-//   ]).then(answers => {
-//     pool.query(`INSERT INTO department (name) VALUES ($1) RETURNING *`, [answers.name], (err, result) => {
-//       if (err) {
-//         console.error(err);
-//         return;
-//       }
-//       departments.push(result.rows[0]);
-//       console.log(`Department added: ${answers.name}`);
-//       inquirer.prompt(mainMenu).then(answers => {
-//         handleOption(answers.option);
-//       });
-//     });
-//   });
-// };
+  const employeeId = employees.find(emp => `${emp.first_name} ${emp.last_name}` === employee).id;
+  const roleId = roles.find(role => role.title === newRole).id;
+  await client.query('UPDATE employees SET role_id = $1 WHERE id = $2', [roleId, employeeId]);
+  console.log('Employee role updated successfully!');
+}
 
-// const addRole = () => {
-//   inquirer.prompt([
-//     {
-//       type: 'input',
-//       name: 'title',
-//       message: 'Enter role title:',
-//     },
-//     {
-//       type: 'input',
-//       name: 'salary',
-//       message: 'Enter role salary:',
-//     },
-//     {
-//       type: 'list',
-//       name: 'department',
-//       message: 'Select department:',
-//       choices: departments.map(department => department.name),
-//     },
-//   ]).then(answers => {
-//     pool.query(`INSERT INTO role (title, salary, department_id) VALUES ($1, $2, (SELECT id FROM department WHERE name = $3)) RETURNING *`, [answers.title, answers.salary, answers.department], (err, result) => {
-//       if (err) {
-//         console.error(err);
-//         return;
-//       }
-//       roles.push(result.rows[0]);
-//       console.log(`Role added: ${answers.title}`);
-//       inquirer.prompt(mainMenu).then(answers => {
-//         handleOption(answers.option);
-//       });
-//     });
-//   });
-// };
+// Start the application
+showMainMenu();
 
-// const addEmployee = () => {
-//   inquirer.prompt([
-//     {
-//       type: 'input',
-//       name: 'first_name',
-//       message: 'Enter employee first name:',
-//     },
-//     {
-//       type: 'input',
-//       name: 'last_name',
-//       message: 'Enter employee last name:',
-//     },
-//     {
-//       type: 'list',
-//       name: 'role',
-//       message: 'Select role:',
-//       choices: roles.map(role => role.title),
-//     },
-//     {
-//       type: 'list',
-//       name: 'manager',
-//       message: 'Select manager:',
-//       choices: employees.map(employee => `${employee.first_name} ${employee.last_name}`),
-//     },
-//   ]).then(answers => {
-//     pool.query(`INSERT INTO employee (first_name, last_name, role_id, manager_id) VALUES ($1, $2, (SELECT id FROM role WHERE title = $3), (SELECT id FROM employee WHERE first_name = $4 AND last_name = $5)) RETURNING *`, [answers.first_name, answers.last_name, answers.role, answers.manager.split(' ')[0], answers.manager.split(' ')[1]], (err, result) => {
-//       if (err) {
-// console.error(err);
-//         return;
-//       }
-//       employees.push(result.rows[0]);
-//       console.log(`Employee added: ${answers.first_name} ${answers.last_name}`);
-//       inquirer.prompt(mainMenu).then(answers => {
-//         handleOption(answers.option);
-//       });
-//     });
-//   });
-// };
-
-// const updateEmployeeRole = () => {
-//   inquirer.prompt([
-//     {
-//       type: 'list',
-//       name: 'employee',
-//       message: 'Select employee:',
-//       choices: employees.map(employee => `${employee.first_name} ${employee.last_name}`),
-//     },
-//     {
-//       type: 'list',
-//       name: 'role',
-//       message: 'Select new role:',
-//       choices: roles.map(role => role.title),
-//     },
-//   ]).then(answers => {
-//     pool.query(`UPDATE employee SET role_id = (SELECT id FROM role WHERE title = $1) WHERE first_name = $2 AND last_name = $3`, [answers.role, answers.employee.split(' ')[0], answers.employee.split(' ')[1]], (err, result) => {
-//       if (err) {
-//         console.error(err);
-//         return;
-//       }
-//       console.log(`Employee role updated: ${answers.employee} -> ${answers.role}`);
-//       inquirer.prompt(mainMenu).then(answers => {
-//         handleOption(answers.option);
-//       });
-//     });
-//   });
-// };
-
-// const handleOption = (option) => {
-//   switch (option) {
-//     case 'View all departments':
-//       viewDepartments();
-//       break;
-//     case 'View all roles':
-//       viewRoles();
-//       break;
-//     case 'View all employees':
-//       viewEmployees();
-//       break;
-//     case 'Add a department':
-//       addDepartment();
-//       break;
-//     case 'Add a role':
-//       addRole();
-//       break;
-//     case 'Add an employee':
-//       addEmployee();
-//       break;
-//     case 'Update an employee role':
-//       updateEmployeeRole();
-//       break;
-//     default:
-//       console.log('Invalid option');
-//       inquirer.prompt(mainMenu).then(answers => {
-//         handleOption(answers.option);
-//       });
-//   }
-// };
-
-// inquirer.prompt(mainMenu).then(answers => {
-//   handleOption(answers.option);
-// });
