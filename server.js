@@ -14,6 +14,7 @@ client.connect();
 
 // Function to display the main menu
 async function showMainMenu() {
+  while (true) {
   const { choice } = await inquirer.prompt([
     {
       type: 'list',
@@ -30,7 +31,9 @@ async function showMainMenu() {
         'Quit'
       ]
     }
-  ])
+  
+  ]);
+
   switch (choice) {
     case 'View all departments':
       await viewDepartments();
@@ -53,19 +56,22 @@ async function showMainMenu() {
     case 'Update an employee role':
       await updateEmployeeRole();
       break;
-    case 'Exit':
+    case 'Quit':
       console.log('Goodbye!');
       client.end();
       return;
+    default:
   }
 
-  showMainMenu();
+  // await showMainMenu();
+}
 }
 // Function to view all departments
 async function viewDepartments() {
   const result = await client.query('SELECT * FROM departments');
   console.table(result.rows);
 }
+
 
 // Function to view all roles
 async function viewRoles() {
